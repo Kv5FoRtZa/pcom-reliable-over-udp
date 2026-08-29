@@ -1,0 +1,47 @@
+Readme Morus Alexandru 323 CC
+
+    La descrierea protocolului, o sa incep cu stabilirea conexiunii
+
+    Am facut handshake-ul (client trimite syn, server syn_ack, client ack). Pentru ca sunt pierderi si pe partea asta, am pus while-uri infinite
+la primele 2, ca sa trimit pana primesc raspunsul, iar la ultimul am trimis intr-un for de cateva ori, pt a ma asigura ca se trimite.
+Daaca ee sansa de 5% sa pice o transmisiune, sansa sa pice toate 15 e aproape 0.
+Pt partea de multiclient am incercat sa fac mai multe chestii. Am facut un map in care bagam fiecare client deja deschis si verificam
+sa nu fie deja acolo, am tinut permanent deschis socket-ul deschis, am acceptat clienti si daca ack-ul final nu se mai dadea si incepeau
+sa se trimita date. Local imi trece uneori primul test de multiclient, pe moodle nu stiu inca daca ar trece sau nu.
+
+    La transferul de date o sa incep sa descriu ce am in lib.h.
+    max_window_seq e dimensiunea ferestrei
+    send_base e primul neconfirmat din fereastra(se muta fereastra pana la el)
+    send_time_ms[MAX_WINDOW_SEGMENTS]; este timerul pt fiecare segent(cand expira retrimit)
+    send_packets[MAX_WINDOW_SEGMENTS][MAX_SEGMENT_SIZE]; sunt segmentele trimise, la expirare de timer le retrimit
+    send_packet_len[MAX_WINDOW_SEGMENTS]; lungimea fiecarui segment trimis
+    send_seq[MAX_WINDOW_SEGMENTS] nr de secventa real(eu fac % max_window_size si am nevoie si de asta real)
+    send_acked[MAX_WINDOW_SEGMENTS]; ca sa stiu cine a primit ack din fereastra deja
+    send_used[MAX_WINDOW_SEGMENTS]; vad daca pozitia x e ocupata sau libera
+    
+    rcv_used,recv_out_of_order_used; cati biti am folosit in buffer
+    rcv_cap e capacitatea buffer-ultimul
+    expected_seq e ce ma astept sa primesc next
+    *recv_buffer; e bufferul in care primesc
+    recv_packets[MAX_WINDOW_SEGMENTS][MAX_DATA_SIZE]; salvez ce am primit out of order aici
+    recv_packet_len[MAX_WINDOW_SEGMENTS]; la fel ca la sender, am lungimea pt astea out of order
+    recv_seq[MAX_WINDOW_SEGMENTS]; si seq real pt ele
+    recv_received[MAX_WINDOW_SEGMENTS]; vad daca e un segment ok pe poz asta(sau e vechi deja scos etc)
+    int recv_window_seq; e dimensiunea ferestrei
+
+    momentan am cateva campuri inutile, initial am implementat un stop and wait si am salvat ceva cod de la stop and wait
+    o sa le scot probabil intr-un submit urmator, momentan sa vad ca da punctaj ok si pe moodle
+
+    Legat de implementarea propriu zisa pt transferul de date
+    Folosesc selective repeat arq. Pe sender am o fereastra de pachete neconfirmate. Cand primesc ack, confirm un pachet.
+    Daca pot muta fereastra mut fereastra. Daca nu, doar verific de timeout pe fiecare in pate. La timeout, trimit iar pachetul.
+    La recover window, primesc pachetele, verific care dintre ele este si il salvez in window. Datorita
+    acestui lucru, ele pot veni in orice ordine, cat timp sunt din fereastra o sa fie primite. Cand e primit unul cu succes dau ack
+    catre sender, si pachetul primit poate fi trimit catrea aplicatie. Aplicatia are un espected seq, si trimite mai departe catre
+    client doar daca urmatorul pahet e ajuns cu bine(eu le primesc out of order si ma si asigur ca la client ajung in order).
+    Pt pierderi legate de checksum nu fac nimic, enuntul zice ca folosim UDP si e un checksum automat acolo. Pierderile sunt
+    tratate doar cand e lipsa de ack, si tot ce fac e sa retrimit cand expira timerul.
+
+    Teoretic primeste conexiuni multiple asa cum am zis si mai sus, dar pica ultimul test mereu, si penultimul uneori(local).
+    Local imi iau timeout si primesc doar 10 sau 20 de pct pe celelalte teste, doar ca eu lucrez pe o masina virtuala cu 
+    4 core-uri. Pe moodle am facut un test mai devreme si mergea cam de 15-25 de ori mai rapid fiecare test(si treceau toate).
